@@ -3344,7 +3344,7 @@ static void dumpTableData(Archive* fout, TableDataInfo* tdinfo)
             
             destroyPQExpBuffer(copyBuf);
             return;
-        } else if (workerNum > 1 && IS_PARTITIONED_RELATION(tbinfo->parttype)) {
+        } else if (workerNum > 1 && enableSplitTable && IS_PARTITIONED_RELATION(tbinfo->parttype)) {
             DataDumperPtr dumpFnSplit = dumpTableDataSplit_copy;
             PQExpBuffer partitionq = createPQExpBuffer();
             PGresult* res = NULL;

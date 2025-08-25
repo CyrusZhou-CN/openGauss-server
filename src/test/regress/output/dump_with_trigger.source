@@ -59,6 +59,7 @@ SET
 SET
 SET
 SET
+SET
 DROP TRIGGER
 DROP TABLE
 DROP FUNCTION
@@ -95,6 +96,7 @@ FROM pg_trigger order by 1;
 \! @abs_bindir@/gs_dump -p @portstring@ -v -f @abs_bindir@/dump_with_trigger2.csv -b dump_with_trigger -c  -t "test_trigger_src_tbl*" >/dev/null 2>&1; echo $?
 0
 \! @abs_bindir@/gsql -d dump_with_trigger2 -p @portstring@ -f "@abs_bindir@/dump_with_trigger2.csv";
+SET
 SET
 SET
 SET
@@ -144,6 +146,7 @@ ALTER TRIGGER
 COMMIT
 --?.*
 \! @abs_bindir@/gsql -d dump_with_trigger -p @portstring@ -f "@abs_bindir@/dump_with_trigger2.csv";
+SET
 SET
 SET
 SET
