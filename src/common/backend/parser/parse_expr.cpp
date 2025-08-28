@@ -1311,7 +1311,7 @@ Node* transformColumnRef(ParseState* pstate, ColumnRef* cref)
 
     /* Only when handle operator "(+)" in WhereClause need recode the RTE info */
     if (pstate->p_plusjoin_rte_info != NULL && pstate->p_plusjoin_rte_info->needrecord && rte != NULL &&
-        (!IsA(node, Var) || ((Var *)node)->varlevelsup == 0) {
+        (!IsA(node, Var) || ((Var *)node)->varlevelsup == 0)) {
         pstate->p_plusjoin_rte_info->info =
             lappend(pstate->p_plusjoin_rte_info->info, makePlusJoinRTEItem(rte, hasplus));
     }
