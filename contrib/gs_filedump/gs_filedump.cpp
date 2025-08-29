@@ -30,6 +30,7 @@
 #include "storage/checksum_impl.h"
 #include "storage/smgr/segment_internal.h"
 #include "storage/smgr/segment.h"
+#include "utils/relmapper.h"
 #include "decode.h"
 #include "segment.h"
 
@@ -2893,48 +2894,67 @@ int DumpUHeapFileContents(unsigned int blockOptions, unsigned int controlOptions
     return result;
 }
 
+
+static int ReadOldVersionRelmapFile(char *buffer, FILE *fd)
+{
+    errno_t rc;
+    char oldMapCache[RELMAP_SIZE_OLD];
+    int readByte = fread(oldMapCache, 1, RELMAP_SIZE_OLD, fd);
+    rc = memcpy_s(buffer, sizeof(RelMapFile), oldMapCache, MAPPING_LEN_OLDMAP_HEAD);
+    securec_check(rc, "\0", "\0");
+    rc = memcpy_s(
+        buffer + offsetof(RelMapFile, crc), MAPPING_LEN_TAIL, oldMapCache + MAPPING_LEN_OLDMAP_HEAD, MAPPING_LEN_TAIL);
+    securec_check(rc, "\0", "\0");
+    return readByte;
+}
+
 int PrintRelMappings(void)
 {
     /* For storing ingested data */
-    char charbuf[RELMAPPER_FILESIZE];
+    char charbuf[sizeof(RelMapFile)];
     RelMapFile *map;
     RelMapping *mappings;
-    RelMapping m;
-    int bytesRead;
-
     /* For confirming Magic Number correctness */
-    char m1[RELMAPPER_MAGICSIZE];
-    char m2[RELMAPPER_MAGICSIZE];
-    int magicRef = RELMAPPER_FILEMAGIC_4K;
+    int32 magicNum;
     int magicVal;
     int numLoops;
-    errno_t rc;
+    int32 relmapSize;
+    int32 relmapMaxMappings;
 
     /* Read in the file */
     rewind(fp);  // Make sure to start from the beginning
-    bytesRead = fread(charbuf, 1, RELMAPPER_FILESIZE, fp);
-    if (bytesRead != RELMAPPER_FILESIZE) {
-        printf("Read %d bytes, expected %d\n", bytesRead, RELMAPPER_FILESIZE);
-        return RETURN_ERROR;
+
+    size_t result = fread(&magicNum, 1, sizeof(int32), fp);
+    rewind(fp);
+    if (result != sizeof(int32)) {
+        fprintf(stderr, "Reading magic error");
+        fclose(fp);
+        return false;
     }
-    /* Convert to RelMapFile type for usability */
-    map = (RelMapFile *)charbuf;
 
-    /* Check and print Magic Number correctness */
-    printf("Magic Number: 0x%x", map->magic);
-    magicVal = map->magic;
-
-    rc = memcpy_s(m1, sizeof(m1), &magicRef, RELMAPPER_MAGICSIZE);
-    securec_check(rc, "\0", "\0");
-
-    rc = memcpy_s(m2, sizeof(m2), &magicVal, RELMAPPER_MAGICSIZE);
-    securec_check(rc, "\0", "\0");
-
-    if (memcmp(m1, m2, RELMAPPER_MAGICSIZE) == 0) {
-        printf(" (CORRECT)\n");
+    if (IS_NEW_RELMAP(magicNum)) {
+        result = fread(charbuf, 1, sizeof(RelMapFile), fp);
+        relmapSize = RELMAP_SIZE_NEW;
+        relmapMaxMappings = MAX_MAPPINGS_4K;
     } else {
-        printf(" (INCORRECT)\n");
+        result = ReadOldVersionRelmapFile(charbuf, fp);
+        relmapSize = RELMAP_SIZE_OLD;
+        relmapMaxMappings = MAX_MAPPINGS;
     }
+
+    if ((size_t)relmapSize != result) {
+        fprintf(stderr, "Reading error");
+        if (fp != nullptr) {
+            fclose(fp);
+            fp = nullptr;
+        }
+        return false;
+    }
+
+    map = (RelMapFile *)charbuf;
+    /* Check and print Magic Number correctness */
+    printf("Magic Number: 0x%x\n", map->magic);
+    magicVal = map->magic;
 
     /* Print Mappings */
     printf("Num Mappings: %d\n", map->num_mappings);
@@ -2943,15 +2963,12 @@ int PrintRelMappings(void)
 
     /* Limit number of mappings as per MAX_MAPPINGS */
     numLoops = map->num_mappings;
-    if (map->num_mappings > MAX_MAPPINGS_4K) {
-        numLoops = MAX_MAPPINGS_4K;
-        printf("  NOTE: listing has been limited to the first %d mappings\n", MAX_MAPPINGS_4K);
-        printf("        (perhaps your file is not a valid pg_filenode.map file?)\n");
-    }
+    for (int i = 0; i < relmapMaxMappings; i++) {
+        if (0 == map->mappings[i].mapoid && 0 == map->mappings[i].mapfilenode)
+            break;
 
-    for (int i = 0; i < numLoops; i++) {
-        m = mappings[i];
-        printf("OID: %u\tFilenode: %u\n", m.mapoid, m.mapfilenode);
+        printf("\t[%d] OID: %u\tFilenode: %u\n",
+            i, map->mappings[i].mapoid, map->mappings[i].mapfilenode);
     }
     return RETURN_SUCCESS;
 }

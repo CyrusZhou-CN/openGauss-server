@@ -96,7 +96,7 @@ def get_oid_mapping(searchpath):
         try:
             for line in execute_command(cmd):
                 line_arr = line.decode('utf-8').strip().split('\t')
-                oid = line_arr[0].split(' ')[1]
+                oid = line_arr[0].split(' ')[2]
                 filenode = line_arr[1].split(' ')[1]
                 oid_mapping[oid] = filenode
         except Exception as e:
