@@ -578,7 +578,7 @@ int main(int argc, char* argv[])
         keywords[7] = "client_encoding";
         values[7] = (char*)((pset.notty || (tmpenv != NULL)) ? NULL : "auto");
         keywords[8] = "connect_timeout";
-        values[8] = CONNECT_TIMEOUT;
+        values[8] = NULL;
 #ifdef HAVE_CE
         keywords[9] = "enable_ce";
         if (!pset.enable_client_encryption_log) {
