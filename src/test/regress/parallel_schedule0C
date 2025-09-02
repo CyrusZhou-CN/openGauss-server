@@ -16,7 +16,7 @@ test: hw_audit_client
 test: hw_audit_full
 test: hw_audit_system_func
 
-test: performance_enhance
+test: performance_enhance b_format_infomation_schema
 test: explain_fqs
 test: explain_pbe smp_2
 
