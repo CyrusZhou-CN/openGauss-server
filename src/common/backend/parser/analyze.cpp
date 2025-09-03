@@ -4947,18 +4947,6 @@ static inline void checkSRFInMultiUpdate(Expr* expr, int targetRelationNum)
     }
 }
 
-static void checkUpdateIdentityColumn(ParseState* pstate, Relation rel, ResTarget* resTarget, int attrno)
-{
-    /* Cannot update identity column in D format */
-    if (DB_IS_CMPT(D_FORMAT)
-        && OidIsValid(pg_get_serial_sequence_internal(RelationGetRelid(rel), attrno, true, NULL))) {
-        ereport(ERROR,
-            (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                errmsg("Cannot update identity column \"%s\"", resTarget->name),
-                parser_errposition(pstate, resTarget->location)));
-    }
-}
-
 /*
  * transformUpdateTargetList -
  * handle SET clause in UPDATE/INSERT ... DUPLICATE KEY UPDATE
@@ -5008,7 +4996,7 @@ static List* transformUpdateTargetList(ParseState* pstate, List* qryTlist, List*
             UndefinedColumnError(pstate, origTarget, targetRelationNum);
         }
 
-        checkUpdateIdentityColumn(pstate, targetrel, origTarget, attrno);
+        checkIdentityColumn(pstate, targetrel, origTarget, attrno, "update");
 
         updateTargetListEntry(pstate, tle, origTarget->name, attrno, origTarget->indirection, origTarget->location,
             targetrel, target_rte);
