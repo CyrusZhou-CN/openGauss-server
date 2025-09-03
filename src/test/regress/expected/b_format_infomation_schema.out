@@ -1,0 +1,28 @@
+\d INFORMATION_SCHEMA.PROFILING
+                          Table "information_schema.profiling"
+       Column        |         Type          |                Modifiers                 
+---------------------+-----------------------+------------------------------------------
+ query_id            | integer               | not null default 0
+ seq                 | integer               | not null default 0
+ state               | character varying(30) | not null default NULL::character varying
+ duration            | numeric(9,6)          | not null default 0.000000
+ cpu_user            | numeric(9,6)          | default NULL::numeric
+ cpu_system          | numeric(9,6)          | default NULL::numeric
+ context_voluntary   | integer               | 
+ context_involuntary | integer               | 
+ block_ops_in        | integer               | 
+ block_ops_out       | integer               | 
+ messages_sent       | integer               | 
+ messages_received   | integer               | 
+ page_faults_major   | integer               | 
+ page_faults_minor   | integer               | 
+ swaps               | integer               | 
+ source_function     | character varying(30) | default NULL::character varying
+ source_file         | character varying(20) | default NULL::character varying
+ source_line         | integer               | 
+
+select * from INFORMATION_SCHEMA.PROFILING;
+ query_id | seq | state | duration | cpu_user | cpu_system | context_voluntary | context_involuntary | block_ops_in | block_ops_out | messages_sent | messages_received | page_faults_major | page_faults_minor | swaps | source_function | source_file | source_line 
+----------+-----+-------+----------+----------+------------+-------------------+---------------------+--------------+---------------+---------------+-------------------+-------------------+-------------------+-------+-----------------+-------------+-------------
+(0 rows)
+
