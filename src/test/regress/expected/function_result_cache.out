@@ -1584,7 +1584,7 @@ begin
   return p2;
 end;
 $$ language plpgsql stable result_cache;
-WARNING:  Function result cache cannot use when function has not in parameters, ignore it.
+WARNING:  Function result cache cannot use when function has parameters of non-IN type, ignore it.
 explain (costs off, analyze, timing off) select func_param_with_out(id) from testtab;
 NOTICE:  param:1
 NOTICE:  param:0
@@ -1614,7 +1614,7 @@ begin
   return p2;
 end;
 $$ language plpgsql stable result_cache;
-WARNING:  Function result cache cannot use when function has not in parameters, ignore it.
+WARNING:  Function result cache cannot use when function has parameters of non-IN type, ignore it.
 explain (costs off, analyze, timing off) select func_param_with_inout(id, id) from testtab;
 NOTICE:  param:1
 NOTICE:  param:0
@@ -1644,7 +1644,7 @@ begin
   p2 = p1 % (p+1) + 10;
 end;
 $$ language plpgsql stable result_cache;
-WARNING:  Function result cache cannot use when function has not in parameters, ignore it.
+WARNING:  Function result cache cannot use when function has parameters of non-IN type, ignore it.
 explain (costs off, analyze, timing off) select func_param_without_retval(id, id) from testtab;
 NOTICE:  param:1
 NOTICE:  param:0

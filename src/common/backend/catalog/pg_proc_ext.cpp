@@ -310,7 +310,8 @@ void check_func_can_cache_result(CreateFunctionStmt* n, bool notsupport)
             if (p->mode != FUNC_PARAM_IN) {
                 list_delete(n->options, valretcache);
                 ereport(WARNING,
-                    (errmsg("Function result cache cannot use when function has not in parameters, ignore it.")));
+                    (errmsg("Function result cache cannot use when function has parameters of non-IN type, "
+                            "ignore it.")));
                 return;
             }
         }
