@@ -163,7 +163,7 @@ extern bool pathkeys_contained_in(List* keys1, List* keys2);
 extern Path* get_cheapest_path_for_pathkeys(
     List* paths, List* pathkeys, Relids required_outer, CostSelector cost_criterion);
 extern Path* get_cheapest_fractional_path_for_pathkeys(
-    List* paths, List* pathkeys, Relids required_outer, double fraction);
+    List* paths, List* pathkeys, Relids required_outer, double fraction, bool flatten_dop = false);
 extern List* build_index_pathkeys(PlannerInfo* root, IndexOptInfo* index, ScanDirection scandir);
 extern List* convert_subquery_pathkeys(PlannerInfo* root, RelOptInfo* rel, List* subquery_pathkeys);
 extern List* build_join_pathkeys(PlannerInfo* root, RelOptInfo* joinrel, JoinType jointype, List* outer_pathkeys);

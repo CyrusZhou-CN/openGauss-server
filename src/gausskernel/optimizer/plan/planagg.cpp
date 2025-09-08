@@ -617,8 +617,8 @@ static bool build_minmax_path(PlannerInfo* root, MinMaxAggInfo* mminfo, Oid eqop
                                       &cheapest_path, 
                                       &sorted_path, 
                                       dNumGroups, 
-                                      has_groupby);
-
+                                      has_groupby,
+                                      false);
 
     /*
      * Fail if no presorted path.  However, if query_planner determines that
