@@ -3324,6 +3324,7 @@ typedef struct knl_session_context {
     knl_u_bm25_context bm25_ctx;
     bool local_memory_exhaust;
     bool enable_rack_memory_free_test;
+    bool enable_identity_insert;
 } knl_session_context;
 
 enum stp_xact_err_type {

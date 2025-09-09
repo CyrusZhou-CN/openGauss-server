@@ -2009,6 +2009,18 @@ static void InitSqlConfigureNamesBool()
             nullptr,
             nullptr
         },
+        {{"identity_insert",
+            PGC_USERSET,
+            NODE_ALL,
+            QUERY_TUNING_OTHER,
+            gettext_noop("enable insert identity column in D mode."),
+            nullptr},
+            &u_sess->enable_identity_insert,
+            false,
+            nullptr,
+            nullptr,
+            nullptr
+        },
         /* End-of-list marker */
         {{NULL,
             (GucContext)0,
