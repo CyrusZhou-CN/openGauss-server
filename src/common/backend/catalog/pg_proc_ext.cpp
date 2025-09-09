@@ -34,30 +34,14 @@
 
 static inline ArrayType* getPartKeysArr(List* partitionCols);
 
-/*
- * @Description: Insert a new record to pg_proc_ext.
- */
-void InsertPgProcExt(Oid oid, FunctionPartitionInfo* partInfo, Oid proprocoid, bool resultCache)
+static void InsertPgProcExtInternal(Relation rel, HeapTuple oldtuple, Oid oid, FunctionPartitionInfo* partInfo,
+    Oid proprocoid, bool resultCache)
 {
     Datum values[Natts_pg_proc_ext];
     bool nulls[Natts_pg_proc_ext];
     bool replaces[Natts_pg_proc_ext];
     HeapTuple tuple = NULL;
-    HeapTuple oldtuple = NULL;
-    Relation rel = NULL;
     errno_t rc = 0;
-
-    rel = heap_open(ProcedureExtensionRelationId, RowExclusiveLock);
-
-    oldtuple = SearchSysCache1(PROCEDUREEXTENSIONOID, ObjectIdGetDatum(oid));
-    if (partInfo == NULL && !OidIsValid(proprocoid) && !resultCache) {
-        if (HeapTupleIsValid(oldtuple)) {
-            simple_heap_delete(rel, &oldtuple->t_self);
-            ReleaseSysCache(oldtuple);
-        }
-        heap_close(rel, RowExclusiveLock);
-        return;
-    }
 
     rc = memset_s(values, sizeof(values), 0, sizeof(values));
     securec_check(rc, "\0", "\0");
@@ -92,58 +76,156 @@ void InsertPgProcExt(Oid oid, FunctionPartitionInfo* partInfo, Oid proprocoid, b
     }
     CatalogUpdateIndexes(rel, tuple);
     heap_freetuple_ext(tuple);
+}
+
+/*
+ * @Description: Insert a new record to pg_proc_ext.
+ */
+void InsertPgProcExt(Oid oid, FunctionPartitionInfo* partInfo, Oid proprocoid, bool resultCache)
+{
+    HeapTuple oldtuple = NULL;
+    Relation rel = NULL;
+
+    rel = heap_open(ProcedureExtensionRelationId, RowExclusiveLock);
+
+    oldtuple = SearchSysCache1(PROCEDUREEXTENSIONOID, ObjectIdGetDatum(oid));
+    if (partInfo == NULL && !OidIsValid(proprocoid) && !resultCache) {
+        if (HeapTupleIsValid(oldtuple)) {
+            simple_heap_delete(rel, &oldtuple->t_self);
+            ReleaseSysCache(oldtuple);
+        }
+        heap_close(rel, RowExclusiveLock);
+        return;
+    }
+    InsertPgProcExtInternal(rel, oldtuple, oid, partInfo, proprocoid, resultCache);
+    
     heap_close(rel, RowExclusiveLock);
 }
 
-void UpdatePgProcExt(Oid funcOid, DefElem* result_cache_item, bool needCleanParallelEnableInfo)
+static bool CheckFunctionCanCache(Oid funcOid, HeapTuple proctup)
 {
-    bool needResultCache = (result_cache_item != NULL && intVal(result_cache_item->arg));
-    if (needResultCache) {
-        HeapTuple tup = SearchSysCache1(PROCEDUREEXTENSIONOID, ObjectIdGetDatum(funcOid));
-        if (!HeapTupleIsValid(tup)) {
-            /* tuple not exists, insert it */
-            InsertPgProcExt(funcOid, NULL, InvalidOid, true);
+    Datum tmp;
+    bool isNull = false;
+    int nargs;
+    int i;
+
+    Form_pg_proc procForm = (Form_pg_proc)GETSTRUCT(proctup);
+    if (!IsPlpgsqlLanguageOid(procForm->prolang) ||
+            procForm->provolatile == PROVOLATILE_VOLATILE ||
+            procForm->proisagg || procForm->proiswindow ||
+            procForm->provariadic != 0) {
+        ereport(WARNING,
+            (errmsg("Function result cache cannot use when function is not stable/immutable or "
+                    "function is agg/window function or function not use plpgsql or function has variadic "
+                    "parameter, ignore it.")));
+        return false;
+    }
+
+    if (procForm->proretset ||
+        !func_cache_support_type(procForm->prorettype)) {
+        ereport(WARNING,
+            (errmsg("Function result cache cannot use when function return not support data type, "
+                    "ignore it.")));
+        return false;
+    }
+
+    (void)SysCacheGetAttr(PROCNAMEARGSNSP, proctup,
+                          Anum_pg_proc_proallargtypes,
+                          &isNull);
+    /* Containing none-IN args */
+    if (!isNull) {
+        ereport(WARNING,
+            (errmsg("Function result cache cannot use when function has parameters of non-IN type, "
+                    "ignore it.")));
+        return false;
+    }
+
+    nargs = procForm->pronargs;
+
+    /* Too many args */
+    if (nargs > FCR_MAX_ARGS) {
+        return false;
+    }
+
+    for (i = 0; i < nargs; i++) {
+        if (!func_cache_support_type(procForm->proargtypes.values[i])) {
+            ereport(WARNING,
+                (errmsg("Function result cache cannot use when function input parameter has unsupport data type, "
+                        "ignore it.")));
+            return false;
+        }
+    }
+}
+
+void UpdatePgProcExt(Oid funcOid, DefElem* result_cache_item, HeapTuple proctup, char provolatile)
+{
+    bool isNull = false;
+    Relation rel;
+    HeapTuple tup;
+
+    rel = heap_open(ProcedureExtensionRelationId, RowExclusiveLock);
+    tup = SearchSysCache1(PROCEDUREEXTENSIONOID, ObjectIdGetDatum(funcOid));
+    if (HeapTupleIsValid(tup)) {
+        Datum dat = SysCacheGetAttr(PROCEDUREEXTENSIONOID, tup, Anum_pg_proc_ext_result_cache, &isNull);
+        bool funcIsResultCache = isNull ? false : DatumGetBool(dat);
+        bool funcCanCache = (funcIsResultCache &&
+                (result_cache_item == NULL || (result_cache_item != NULL && intVal(result_cache_item->arg)))) ||
+            (result_cache_item != NULL && intVal(result_cache_item->arg));
+        if (funcCanCache) {
+            funcCanCache = CheckFunctionCanCache(funcOid, proctup);
+        }
+
+        /* delete tuple */
+        if (!funcCanCache && provolatile != PROVOLATILE_IMMUTABLE) {
+            simple_heap_delete(rel, &tup->t_self);
+            ReleaseSysCache(tup);
+            heap_close(rel, RowExclusiveLock);
             return;
         }
 
-        Relation rel = heap_open(ProcedureExtensionRelationId, RowExclusiveLock);
-        Datum repl_val[Natts_pg_proc_ext];
-        bool repl_null[Natts_pg_proc_ext];
-        bool repl_repl[Natts_pg_proc_ext];
-        errno_t rc = EOK;
+        /* replace value */
+        if (result_cache_item != NULL || provolatile != PROVOLATILE_IMMUTABLE) {
+            Datum repl_val[Natts_pg_proc_ext];
+            bool repl_null[Natts_pg_proc_ext];
+            bool repl_repl[Natts_pg_proc_ext];
+            errno_t rc = EOK;
 
-        rc = memset_s(repl_repl, sizeof(repl_repl), false, sizeof(repl_repl));
-        securec_check(rc, "\0", "\0");
-    
-        if (result_cache_item != NULL) {
-            repl_repl[Anum_pg_proc_ext_result_cache - 1] = true;
-            repl_val[Anum_pg_proc_ext_result_cache - 1] = BoolGetDatum(intVal(result_cache_item->arg));
-            repl_null[Anum_pg_proc_ext_result_cache - 1] = false;
+            rc = memset_s(repl_repl, sizeof(repl_repl), false, sizeof(repl_repl));
+            securec_check(rc, "\0", "\0");
+        
+            if (result_cache_item != NULL) {
+                repl_repl[Anum_pg_proc_ext_result_cache - 1] = true;
+                repl_val[Anum_pg_proc_ext_result_cache - 1] = BoolGetDatum(intVal(result_cache_item->arg));
+                repl_null[Anum_pg_proc_ext_result_cache - 1] = false;
+            }
+
+            if (provolatile != PROVOLATILE_IMMUTABLE) {
+                repl_repl[Anum_pg_proc_ext_parallel_cursor_seq - 1] = true;
+                repl_null[Anum_pg_proc_ext_parallel_cursor_seq - 1] = true;
+                repl_repl[Anum_pg_proc_ext_parallel_cursor_strategy - 1] = true;
+                repl_null[Anum_pg_proc_ext_parallel_cursor_strategy - 1] = true;
+                repl_repl[Anum_pg_proc_ext_parallel_cursor_partkey - 1] = true;
+                repl_null[Anum_pg_proc_ext_parallel_cursor_partkey - 1] = true;
+            }
+
+            HeapTuple newtup = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
+
+            simple_heap_update(rel, &newtup->t_self, newtup);
+            CatalogUpdateIndexes(rel, newtup);
+
+            heap_freetuple(newtup);
         }
-
-        if (needCleanParallelEnableInfo) {
-            repl_repl[Anum_pg_proc_ext_parallel_cursor_seq - 1] = true;
-            repl_null[Anum_pg_proc_ext_parallel_cursor_seq - 1] = true;
-            repl_repl[Anum_pg_proc_ext_parallel_cursor_strategy - 1] = true;
-            repl_null[Anum_pg_proc_ext_parallel_cursor_strategy - 1] = true;
-            repl_repl[Anum_pg_proc_ext_parallel_cursor_partkey - 1] = true;
-            repl_null[Anum_pg_proc_ext_parallel_cursor_partkey - 1] = true;
-        }
-
-        HeapTuple newtup = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
-
-        simple_heap_update(rel, &newtup->t_self, newtup);
-        CatalogUpdateIndexes(rel, newtup);
 
         ReleaseSysCache(tup);
-        heap_freetuple(newtup);
         heap_close(rel, RowExclusiveLock);
         return;
     }
 
-    if (needCleanParallelEnableInfo) {
-        DeletePgProcExt(funcOid);
+    /* tuple not exists, result_cache is true and function is not volatile, insert it */
+    if (result_cache_item != NULL && intVal(result_cache_item->arg) && CheckFunctionCanCache(funcOid, proctup)) {
+        InsertPgProcExtInternal(rel, NULL, funcOid, NULL, InvalidOid, true);
     }
+    heap_close(rel, RowExclusiveLock);
 }
 
 void DeletePgProcExt(Oid oid)

@@ -125,12 +125,6 @@
 
 #define FR_CACHE_SEG_RANGE ((UINT32_MAX + 1) / FR_CACHE_NUM_BUCKETS)
 
-#if FUNC_MAX_ARGS > 16
-#define FCR_MAX_ARGS (16)
-#else
-#define FCR_MAX_ARGS (FUNC_MAX_ARGS)
-#endif
-
 #if FNCACHE_NUM_ARGS < FCR_MAX_ARGS
 #error FCR_MAX_ARGS too large
 #endif
@@ -3311,7 +3305,7 @@ void set_result_for_plpgsql_language_function_with_outparam_by_flatten(Datum *re
     pfree(nulls);
 }
 
-static bool func_cache_support_type(Oid typ)
+bool func_cache_support_type(Oid typ)
 {
     if (typ >= FirstBootstrapObjectId) {
         Oid basetyp = getBaseType(typ);

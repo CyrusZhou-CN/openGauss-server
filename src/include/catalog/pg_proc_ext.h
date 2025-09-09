@@ -28,7 +28,9 @@
 #ifndef PG_PROC_EXT_H
 #define PG_PROC_EXT_H
 
+#include "access/htup.h"
 #include "catalog/genbki.h"
+#include "catalog/pg_proc.h"
 #include "nodes/parsenodes_common.h"
 
 /* ----------------
@@ -70,6 +72,12 @@ typedef FormData_pg_proc_ext *Form_pg_proc_ext;
 #define Anum_pg_proc_ext_procoid                   5
 #define Anum_pg_proc_ext_result_cache              6
 
+#if FUNC_MAX_ARGS > 16
+#define FCR_MAX_ARGS (16)
+#else
+#define FCR_MAX_ARGS (FUNC_MAX_ARGS)
+#endif
+
 extern void InsertPgProcExt(
     Oid oid, FunctionPartitionInfo* partInfo, Oid proprocoid = InvalidOid, bool resultCache = false);
 extern int2 GetParallelCursorSeq(Oid oid);
@@ -77,8 +85,9 @@ extern FunctionPartitionStrategy GetParallelStrategyAndKey(Oid oid, List** partk
 extern void DeletePgProcExt(Oid oid);
 extern Oid GetProprocoidByOid(Oid oid);
 extern bool GetResultCacheByOid(Oid oid);
-extern void UpdatePgProcExt(Oid funcOid, DefElem* result_cache_item, bool needCleanParallelEnableInfo);
+extern void UpdatePgProcExt(Oid funcOid, DefElem* result_cache_item, HeapTuple proctup, char provolatile);
 extern void check_func_can_cache_result(CreateFunctionStmt* n, bool notsupport);
+extern bool func_cache_support_type(Oid typ);
 
 #endif   /* PG_PROC_EXT_H */
 
