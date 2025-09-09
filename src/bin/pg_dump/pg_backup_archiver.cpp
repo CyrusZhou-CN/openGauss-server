@@ -2889,6 +2889,9 @@ static void _doSetFixedOutputState(ArchiveHandle* AH)
     /* Make sure function checking is disabled */
     (void)ahprintf(AH, "SET check_function_bodies = false;\n");
 
+    /* Make sure create indexes after data loading */
+    (void)ahprintf(AH, "SET lockwait_timeout = '0';\n");
+
     /* Make sure trigger checking is disabled */
     (void)ahprintf(AH, "SET session_replication_role = replica;\n");
 
