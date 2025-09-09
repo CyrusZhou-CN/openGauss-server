@@ -106,6 +106,11 @@ void enlargeBuffer(int needed,   // needed more bytes
         exit(1);
     }
 
+    if (unlikely(len > INT_MAX - needed - 1)) {
+        ereport(ERROR,
+            (errcode(ERRCODE_INVALID_PARAMETER_VALUE), errmsg("requested buffer size would overflow: %d", needed)));
+    }
+
     needed += len + 1; /* total space required now */
 
     /* Because of the above test, we now have needed <= MAX_ALLOC_SIZE */

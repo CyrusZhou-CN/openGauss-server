@@ -83,9 +83,11 @@ void extractPageMap(const char* datadir, XLogRecPtr startpoint, TimeLineID tli)
     readprivate.datadir = datadir;
     readprivate.tli = tli;
     xlogreader = XLogReaderAllocate(&SimpleXLogPageRead, &readprivate);
-    if (xlogreader == NULL)
+    if (xlogreader == NULL) {
         pg_log(PG_ERROR, "out of memory\n");
-
+        return;
+    }
+  
     do {
         record = XLogReadRecord(xlogreader, startpoint, &errormsg);
         if (record == NULL) {
