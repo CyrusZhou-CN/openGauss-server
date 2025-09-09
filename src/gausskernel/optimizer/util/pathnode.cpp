@@ -133,7 +133,7 @@ int compare_path_costs(Path* path1, Path* path2, CostSelector criterion)
  * If fraction is <= 0 or > 1, we interpret it as 1, ie, we select the
  * path with the cheaper total_cost.
  */
-int compare_fractional_path_costs(Path* path1, Path* path2, double fraction)
+int compare_fractional_path_costs(Path* path1, Path* path2, double fraction, bool flatten_dop)
 {
     Cost cost1, cost2;
 
@@ -141,6 +141,14 @@ int compare_fractional_path_costs(Path* path1, Path* path2, double fraction)
         return compare_path_costs(path1, path2, TOTAL_COST);
     cost1 = path1->startup_cost + fraction * (path1->total_cost - path1->startup_cost);
     cost2 = path2->startup_cost + fraction * (path2->total_cost - path2->startup_cost);
+
+    if (flatten_dop && path1->dop > 0) {
+        cost1 *= path1->dop;
+    }
+    if (flatten_dop && path2->dop > 0) {
+        cost2 *= path2->dop;
+    }
+
     if (cost1 < cost2)
         return -1;
     if (cost1 > cost2)

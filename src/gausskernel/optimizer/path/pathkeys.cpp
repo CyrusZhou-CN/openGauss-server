@@ -484,7 +484,8 @@ Path* get_cheapest_path_for_pathkeys(List* paths, List* pathkeys, Relids require
  * 'required_outer' denotes allowable outer relations for parameterized paths
  * 'fraction' is the fraction of the total tuples expected to be retrieved
  */
-Path* get_cheapest_fractional_path_for_pathkeys(List* paths, List* pathkeys, Relids required_outer, double fraction)
+Path* get_cheapest_fractional_path_for_pathkeys(List* paths, List* pathkeys, Relids required_outer,
+    double fraction, bool flatten_dop)
 {
     Path* matched_path = NULL;
     ListCell* l = NULL;
@@ -496,8 +497,9 @@ Path* get_cheapest_fractional_path_for_pathkeys(List* paths, List* pathkeys, Rel
          * Since cost comparison is a lot cheaper than pathkey comparison, do
          * that first.	(XXX is that still true?)
          */
-        if (matched_path != NULL && compare_fractional_path_costs(matched_path, path, fraction) <= 0)
+        if (matched_path != NULL && compare_fractional_path_costs(matched_path, path, fraction, flatten_dop) <= 0) {
             continue;
+        }
 
         if (pathkeys_contained_in(pathkeys, path->pathkeys) && bms_is_subset(PATH_REQ_OUTER(path), required_outer))
             matched_path = path;

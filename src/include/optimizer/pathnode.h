@@ -45,7 +45,7 @@ typedef enum SJoinUniqueMethod {
  * prototypes for pathnode.c
  */
 extern int compare_path_costs(Path* path1, Path* path2, CostSelector criterion);
-extern int compare_fractional_path_costs(Path* path1, Path* path2, double fraction);
+extern int compare_fractional_path_costs(Path* path1, Path* path2, double fraction, bool flatten_dop = false);
 extern void set_cheapest(RelOptInfo* parent_rel, PlannerInfo* root = NULL);
 extern Path* get_cheapest_path(PlannerInfo* root, RelOptInfo* rel, const double* agg_groups, bool has_groupby);
 extern Path* find_hinted_path(Path* current_path);
